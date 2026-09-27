@@ -12,13 +12,13 @@ import MediaServiceId from 'types/MediaServiceId';
 import PlaybackType from 'types/PlaybackType';
 import PublicMediaService from 'types/PublicMediaService';
 import ServiceType from 'types/ServiceType';
-import {chunk, groupBy} from 'utils';
+import { chunk, groupBy } from 'utils';
 import actionsStore from 'services/actions/actionsStore';
-import {dispatchMetadataChanges} from 'services/metadata';
+import { dispatchMetadataChanges } from 'services/metadata';
 import fetchAllTracks from 'services/pagers/fetchAllTracks';
 import fetchFirstPage from 'services/pagers/fetchFirstPage';
 import SimplePager from 'services/pagers/SimplePager';
-import MusicKitPager, {MusicKitPage} from './MusicKitPager';
+import MusicKitPager, { MusicKitPage } from './MusicKitPager';
 import {
     observeConnecting,
     observeConnectionLogging,
@@ -48,6 +48,7 @@ import {
 import Credentials from './components/AppleCredentials';
 import Login from './components/AppleLogin';
 import StreamingSettings from './components/AppleStreamingSettings';
+import GeneralSettings from './components/AppleGeneralSettings';
 import './bootstrap';
 
 const serviceId: MediaServiceId = 'apple';
@@ -61,7 +62,7 @@ const apple: PublicMediaService = {
     serviceType: ServiceType.PublicMedia,
     browsable: true,
     internetRequired: true,
-    Components: {Credentials, Login, StreamingSettings},
+    Components: { Credentials, Login, StreamingSettings, GeneralSettings },
     get credentialsLocked(): boolean {
         return appleSettings.credentialsLocked;
     },
@@ -124,7 +125,7 @@ async function addMetadata<T extends MediaObject>(item: T): Promise<T> {
             }
         }
         if (inLibrary !== undefined) {
-            return {...item, inLibrary};
+            return { ...item, inLibrary };
         }
     }
     return item;
@@ -141,12 +142,12 @@ async function addToPlaylist<T extends MediaItem>(
     const [, , id] = playlist.src.split(':');
     const tracks = items.map((item) => {
         const [, type, id] = item.src.split(':');
-        return {id, type};
+        return { id, type };
     });
     await musicKit.api.music(`/v1/me/library/playlists/${id}/tracks`, undefined, {
         fetchOptions: {
             method: 'POST',
-            body: JSON.stringify({data: tracks}),
+            body: JSON.stringify({ data: tracks }),
         },
     });
 }
@@ -174,15 +175,15 @@ function canStore<T extends MediaObject>(item: T): boolean {
 
 async function createPlaylist<T extends MediaItem>(
     name: string,
-    {description = '', isPublic, items = []}: CreatePlaylistOptions<T> = {}
+    { description = '', isPublic, items = [] }: CreatePlaylistOptions<T> = {}
 ): Promise<MediaPlaylist> {
     const musicKit = MusicKit.getInstance();
-    const attributes = {name, description, isPublic};
+    const attributes = { name, description, isPublic };
     const tracks = items.map((item) => {
         const [, type, id] = item.src.split(':');
-        return {id, type};
+        return { id, type };
     });
-    const relationships = {tracks: {data: tracks}};
+    const relationships = { tracks: { data: tracks } };
     const {
         data: {
             data: [playlist],
@@ -190,7 +191,7 @@ async function createPlaylist<T extends MediaItem>(
     } = await musicKit.api.music('/v1/me/library/playlists', undefined, {
         fetchOptions: {
             method: 'POST',
-            body: JSON.stringify({attributes, relationships}),
+            body: JSON.stringify({ attributes, relationships }),
         },
     });
     return {
@@ -224,16 +225,16 @@ async function getDroppedItems(
         }
 
         case 'text/plain': {
-            const {items} = JSON.parse(data);
-            const [{kind}] = items;
+            const { items } = JSON.parse(data);
+            const [{ kind }] = items;
             if (kind === 'album') {
                 const [item] = items;
                 const {
-                    identifiers: {storeAdamID},
+                    identifiers: { storeAdamID },
                 } = item;
                 return getTracksByAlbumId(storeAdamID);
             } else if (kind === 'song') {
-                const trackIds = items.map(({identifiers: {storeAdamID}}: any) => storeAdamID);
+                const trackIds = items.map(({ identifiers: { storeAdamID } }: any) => storeAdamID);
                 return getTracksById(trackIds);
             } else {
                 throw Error('Unsupported drop type.');
@@ -273,8 +274,8 @@ async function getTracksById(trackIds: readonly string[]): Promise<readonly Medi
     const ids = trackIds.slice(0, pageSize);
     const pager = new MusicKitPager<MediaItem>(
         '/v1/catalog/{{storefrontId}}',
-        {['ids[songs]']: ids},
-        {pageSize, maxSize: pageSize}
+        { ['ids[songs]']: ids },
+        { pageSize, maxSize: pageSize }
     );
     return fetchFirstPage(pager);
 }
@@ -307,16 +308,16 @@ async function getGenres(filterType: FilterType): Promise<readonly MediaFilter[]
         const musicKit = MusicKit.getInstance();
         const genreType = isByStationGenre ? 'station-genres' : 'genres';
         const {
-            data: {data},
+            data: { data },
         } = await musicKit.api.music(`/v1/catalog/{{storefrontId}}/${genreType}`, {
             limit: 200,
         });
         genres = data
-            .map(({id, attributes, type}: any) => ({
+            .map(({ id, attributes, type }: any) => ({
                 id,
                 title: attributes.parentId || type === 'station-genres' ? attributes.name : '(all)',
             }))
-            .concat(isByStationGenre ? [{id: '#live', title: 'Live Radio'}] : [])
+            .concat(isByStationGenre ? [{ id: '#live', title: 'Live Radio' }] : [])
             .sort((a: MediaFilter, b: MediaFilter) => {
                 return a.title.localeCompare(b.title);
             });
@@ -340,15 +341,15 @@ async function getMediaObject<T extends MediaObject>(src: string): Promise<T> {
         },
         [inLibrary],
     ] = await Promise.all([
-        musicKitFetch<{data: {data: readonly MusicKitItem[]}}>(
+        musicKitFetch<{ data: { data: readonly MusicKitItem[] } }>(
             `${path}/${type.replace('library-', '')}/${id}`,
             musicKitParams
         ),
         type.startsWith('library-')
             ? Promise.resolve([true])
             : type === 'artists'
-              ? Promise.resolve([])
-              : getInLibrary(type, [id]),
+                ? Promise.resolve([])
+                : getInLibrary(type, [id]),
     ]);
     const item = createMediaObject<T>(object);
     (item as any).inLibrary = inLibrary;
@@ -374,17 +375,17 @@ async function lookup(
             types: 'songs,music-videos',
             term: `${title} ${artist}`,
         },
-        {pageSize: limit, maxSize: 2 * limit, passive: true},
+        { pageSize: limit, maxSize: 2 * limit, passive: true },
         undefined,
         (response: any): MusicKitPage => {
             const songs = response.results?.songs?.data || [];
             const videos = response.results?.['music-videos']?.data || [];
             const items = songs.concat(videos);
             const total = items.length;
-            return {items, total, atEnd: true};
+            return { items, total, atEnd: true };
         }
     );
-    const items = await fetchFirstPage(pager, {timeout});
+    const items = await fetchFirstPage(pager, { timeout });
     return items.filter((item) => !item.unplayable);
 }
 
@@ -399,10 +400,10 @@ async function lookupByISRC(
     // https://developer.apple.com/documentation/applemusicapi/get_multiple_catalog_songs_by_isrc
     const pager = new MusicKitPager<MediaItem>(
         '/v1/catalog/{{storefrontId}}/songs',
-        {'filter[isrc]': isrcs.slice(0, 25).join(',')},
-        {pageSize: limit, maxSize: limit, passive: true}
+        { 'filter[isrc]': isrcs.slice(0, 25).join(',') },
+        { pageSize: limit, maxSize: limit, passive: true }
     );
-    const items = await fetchFirstPage(pager, {timeout});
+    const items = await fetchFirstPage(pager, { timeout });
     return items.filter((item) => !item.unplayable);
 }
 
@@ -415,12 +416,12 @@ async function store(item: MediaObject, inLibrary: boolean): Promise<void> {
 
     if (inLibrary) {
         const key = `ids[${kind}]`;
-        return musicKit.api.music(path, {[key]: id}, {fetchOptions: {method: 'POST'}});
+        return musicKit.api.music(path, { [key]: id }, { fetchOptions: { method: 'POST' } });
     } else {
         // This doesn't currently work.
         // https://developer.apple.com/forums/thread/107807
         return musicKit.api.music(`${path}/${kind}/${id}`, undefined, {
-            fetchOptions: {method: 'DELETE'},
+            fetchOptions: { method: 'DELETE' },
         });
     }
 }
@@ -442,7 +443,7 @@ async function addUserData<T extends MediaObject>(items: readonly T[]): Promise<
                 dispatchMetadataChanges(
                     ids.map((id, index) => ({
                         match: (object: MediaObject) => object.apple?.catalogId === id,
-                        values: {inLibrary: inLibrary[index]},
+                        values: { inLibrary: inLibrary[index] },
                     }))
                 );
             })
@@ -461,7 +462,7 @@ async function getInLibrary(
     const musicKit = MusicKit.getInstance();
     const fetchMany = async (ids: readonly string[]) => {
         const {
-            data: {resources},
+            data: { resources },
         } = await musicKit.api.music('/v1/catalog/{{storefrontId}}', {
             [`fields[${type}]`]: 'inLibrary',
             'format[resources]': 'map',

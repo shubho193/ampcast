@@ -1,6 +1,8 @@
 .settings-dialog {
     width: 45em;
-    height: 37.5em; /* For the tallest tab */
+    height: 44em;
+    /* For the tallest tab */
+    max-height: calc(100vh - 1em);
 
     &::backdrop {
         /* This helps with theme editing. */
@@ -10,7 +12,8 @@
     .dialog-body {
         display: flex;
         flex-direction: row;
-        height: 100%;
+        height: calc(100% - 2em - 0.375em);
+        box-sizing: border-box;
     }
 
     &-sources {
@@ -32,6 +35,23 @@
         display: flex;
         flex: auto;
         margin-left: 1em;
+        min-width: 0;
+        min-height: 0;
+
+        .tab-list {
+            min-height: 0;
+            height: 100%;
+
+            &-panels {
+                min-height: 0;
+            }
+
+            .tab-panel {
+                height: 100%;
+                box-sizing: border-box;
+                overflow-y: auto;
+            }
+        }
     }
 
     .media-services {
@@ -46,7 +66,7 @@
 
     .scrobbling-settings {
         .checkbox-list {
-            max-height: 16em;        
+            max-height: 16em;
         }
 
         .scrobbler-options {

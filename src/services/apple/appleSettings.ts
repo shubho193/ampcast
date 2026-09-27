@@ -1,7 +1,7 @@
-import type {Observable} from 'rxjs';
-import {BehaviorSubject} from 'rxjs';
-import {LiteStorage} from 'utils';
-import {am_dev_token} from 'services/mediaServices/buildConfig';
+import type { Observable } from 'rxjs';
+import { BehaviorSubject, distinctUntilChanged, map, startWith } from 'rxjs';
+import { LiteStorage } from 'utils';
+import { am_dev_token } from 'services/mediaServices/buildConfig';
 import AppleBitrate from './AppleBitrate';
 
 export interface AppleCredentials {
@@ -9,7 +9,7 @@ export interface AppleCredentials {
 }
 
 const storage = new LiteStorage('apple');
-const credentials$ = new BehaviorSubject<AppleCredentials>({devToken: ''});
+const credentials$ = new BehaviorSubject<AppleCredentials>({ devToken: '' });
 
 const appleSettings = {
     get bitrate(): AppleBitrate {
@@ -39,7 +39,7 @@ const appleSettings = {
     set devToken(devToken: string) {
         if (!am_dev_token) {
             storage.setString('devToken', devToken);
-            credentials$.next({devToken});
+            credentials$.next({ devToken });
         }
     },
 
@@ -51,6 +51,14 @@ const appleSettings = {
         storage.setString('favoriteSongsId', id);
     },
 
+    get skipRadioWithMediaButtons(): boolean {
+        return storage.getBoolean('skipRadioWithMediaButtons', false);
+    },
+
+    set skipRadioWithMediaButtons(skipRadioWithMediaButtons: boolean) {
+        storage.setBoolean('skipRadioWithMediaButtons', skipRadioWithMediaButtons);
+    },
+
     observeCredentials(this: unknown): Observable<AppleCredentials> {
         return credentials$;
     },
@@ -60,6 +68,14 @@ const appleSettings = {
     },
 };
 
-credentials$.next({devToken: appleSettings.devToken});
+credentials$.next({ devToken: appleSettings.devToken });
 
 export default appleSettings;
+
+export function observeSkipRadioWithMediaButtons(): Observable<boolean> {
+    return storage.observeChange().pipe(
+        startWith(undefined),
+        map(() => appleSettings.skipRadioWithMediaButtons),
+        distinctUntilChanged()
+    );
+}

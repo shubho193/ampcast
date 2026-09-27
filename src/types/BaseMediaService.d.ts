@@ -1,6 +1,6 @@
 import type React from 'react';
-import type {DialogProps} from 'components/Dialog';
-import type {IconName} from 'components/Icon';
+import type { DialogProps } from 'components/Dialog';
+import type { IconName } from 'components/Icon';
 import Auth from './Auth';
 import CreatePlaylistOptions from './CreatePlaylistOptions';
 import FilterType from './FilterType';
@@ -12,10 +12,10 @@ import MediaItem from './MediaItem';
 import MediaObject from './MediaObject';
 import MediaPlaylist from './MediaPlaylist';
 import MediaService from './MediaService';
-import MediaSource, {AnyMediaSource} from './MediaSource';
+import MediaSource, { AnyMediaSource } from './MediaSource';
 import Pager from './Pager';
 import PlaybackType from './PlaybackType';
-import Pin, {Pinnable} from './Pin';
+import Pin, { Pinnable } from './Pin';
 
 type BaseMediaService = Auth & {
     readonly id: MediaServiceId;
@@ -40,23 +40,24 @@ type BaseMediaService = Auth & {
     readonly editablePlaylists?: MediaSource<MediaPlaylist>;
     readonly starRatingIncrement?: 0.5 | 1; // Default is 1.
     readonly Components?: {
-        readonly Credentials?: React.FC<{service: MediaService}>;
-        readonly Login?: React.FC<{service: MediaService}>;
+        readonly Credentials?: React.FC<{ service: MediaService }>;
+        readonly Login?: React.FC<{ service: MediaService }>;
+        readonly GeneralSettings?: React.FC<{ service: MediaService }>;
         // Radio stations.
-        readonly EditStationDialog?: React.FC<DialogProps & {station: MediaItem}>;
+        readonly EditStationDialog?: React.FC<DialogProps & { station: MediaItem }>;
         readonly CreateStationDialog?: React.FC<DialogProps>;
-        readonly ManageStations?: React.FC<{service: MediaService}>;
+        readonly ManageStations?: React.FC<{ service: MediaService }>;
     };
     // For services that play audio in an iframe.
     readonly iframeAudioPlayback?:
-        | {
-              readonly showContent?: false | undefined;
-              readonly showCoverArt?: boolean; // Show CoverArt visualizer instead.
-          }
-        | {
-              readonly showContent: true;
-              readonly isCoverArt?: boolean; // Shows enough metadata to not require a hover state.
-          };
+    | {
+        readonly showContent?: false | undefined;
+        readonly showCoverArt?: boolean; // Show CoverArt visualizer instead.
+    }
+    | {
+        readonly showContent: true;
+        readonly isCoverArt?: boolean; // Shows enough metadata to not require a hover state.
+    };
     addMetadata?: <T extends MediaObject>(item: T) => Promise<T>;
     addUserData?: (items: readonly MediaObject[]) => Promise<void>;
     addToPlaylist?: (

@@ -1,7 +1,9 @@
 import React from 'react';
-import {ListViewHandle} from 'components/ListView';
-import {IconButtons} from 'components/Button';
+import { ListViewHandle } from 'components/ListView';
+import { IconButtons } from 'components/Button';
+import appleSettings, { observeSkipRadioWithMediaButtons } from 'services/apple/appleSettings';
 import useCurrentlyPlaying from 'hooks/useCurrentlyPlaying';
+import useObservable from 'hooks/useObservable';
 import usePlaybackState from 'hooks/usePlaybackState';
 import MediaButtons from './MediaButtons';
 import PlaylistMenuButton from './PlaylistMenuButton';
@@ -16,9 +18,19 @@ export interface MediaControlsProps {
     playlistRef?: React.RefObject<ListViewHandle | null>;
 }
 
-export default function MediaControls({overlay, playlistRef}: MediaControlsProps) {
+export default function MediaControls({ overlay, playlistRef }: MediaControlsProps) {
     const currentlyPlaying = useCurrentlyPlaying();
-    const {paused} = usePlaybackState();
+    const { paused } = usePlaybackState();
+    const skipRadioWithMediaButtons = useObservable(
+        observeSkipRadioWithMediaButtons,
+        appleSettings.skipRadioWithMediaButtons
+    );
+    const isAppleRadioSkipping = Boolean(
+        skipRadioWithMediaButtons &&
+        currentlyPlaying?.apple &&
+        currentlyPlaying?.skippable &&
+        !currentlyPlaying?.isLivePlayback
+    );
 
     return (
         <div className={`media-controls${overlay ? '-overlay' : ''}`}>
@@ -30,7 +42,7 @@ export default function MediaControls({overlay, playlistRef}: MediaControlsProps
                         <IconButtons className="media-buttons">
                             <MediaButtons overlay={overlay} />
                         </IconButtons>
-                        {currentlyPlaying?.skippable && !paused ? (
+                        {currentlyPlaying?.skippable && !paused && !isAppleRadioSkipping ? (
                             <IconButtons className="radio-buttons">
                                 <RadioButtons overlay />
                             </IconButtons>

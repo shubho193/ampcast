@@ -1,4 +1,4 @@
-import type {Observable} from 'rxjs';
+import type { Observable } from 'rxjs';
 import {
     EMPTY,
     BehaviorSubject,
@@ -27,18 +27,19 @@ import Player from 'types/Player';
 import PlaybackType from 'types/PlaybackType';
 import PlaylistItem from 'types/PlaylistItem';
 import RepeatMode from 'types/RepeatMode';
-import {formatDuration, formatTime, isMiniPlayer, Logger} from 'utils';
-import {MAX_DURATION} from 'services/constants';
-import {createMediaItemFromUrl, dispatchMetadataChanges} from 'services/metadata';
+import { formatDuration, formatTime, isMiniPlayer, Logger } from 'utils';
+import { MAX_DURATION } from 'services/constants';
+import { createMediaItemFromUrl, dispatchMetadataChanges } from 'services/metadata';
 import lookup from 'services/lookup';
-import {hasPlayableSrc, getServiceFromSrc} from 'services/mediaServices';
+import { hasPlayableSrc, getServiceFromSrc } from 'services/mediaServices';
 import playlist from 'services/playlist';
-import {lockVisualizer, setCurrentVisualizer} from 'services/visualizer';
+import appleSettings from 'services/apple/appleSettings';
+import { lockVisualizer, setCurrentVisualizer } from 'services/visualizer';
 import mediaPlayer from './mediaPlayer';
 import miniPlayer from './miniPlayer';
 import miniPlayerRemote from './miniPlayerRemote';
-import playback, {observePaused} from './playback';
-import playbackSettings, {observePlaybackSettings} from './playbackSettings';
+import playback, { observePaused } from './playback';
+import playbackSettings, { observePlaybackSettings } from './playbackSettings';
 import visualizerPlayer from './visualizerPlayer';
 import './scrobbler';
 
@@ -185,10 +186,22 @@ function resize(width: number, height: number): void {
     visualizerPlayer.resize(width, height);
 }
 
+function shouldSkipAppleRadio(): boolean {
+    const currentItem = playlist.getCurrentItem();
+    return Boolean(
+        appleSettings.skipRadioWithMediaButtons &&
+        currentItem?.apple &&
+        currentItem?.skippable &&
+        !currentItem?.isLivePlayback
+    );
+}
+
 export function prev(): void {
     logger.log('prev');
     if (isMiniPlayer) {
         miniPlayerRemote.prev();
+    } else if (shouldSkipAppleRadio()) {
+        skipPrev();
     } else if (
         !playlist.atStart ||
         (mediaPlayback.repeatMode === RepeatMode.All && !playlist.atEnd)
@@ -208,6 +221,8 @@ export function next(): void {
     logger.log('next');
     if (isMiniPlayer) {
         miniPlayerRemote.next();
+    } else if (shouldSkipAppleRadio()) {
+        skipNext();
     } else if (
         !playlist.atEnd ||
         (mediaPlayback.repeatMode === RepeatMode.All && !playlist.atStart)
@@ -223,21 +238,39 @@ export function next(): void {
     }
 }
 
+let isSkipping = false;
+
 async function skipPrev(): Promise<void> {
-    if (miniPlayer.active) {
-        miniPlayer.skipPrev();
-        await waitForNextTrack();
-    } else {
-        await mediaPlayer.skipPrev();
+    if (isSkipping) return;
+    try {
+        isSkipping = true;
+        if (miniPlayer.active) {
+            miniPlayer.skipPrev();
+            await waitForNextTrack();
+        } else {
+            await mediaPlayer.skipPrev();
+        }
+    } catch (err) {
+        logger.error('Failed to skip prev', err);
+    } finally {
+        isSkipping = false;
     }
 }
 
 async function skipNext(): Promise<void> {
-    if (miniPlayer.active) {
-        miniPlayer.skipNext();
-        await waitForNextTrack();
-    } else {
-        await mediaPlayer.skipNext();
+    if (isSkipping) return;
+    try {
+        isSkipping = true;
+        if (miniPlayer.active) {
+            miniPlayer.skipNext();
+            await waitForNextTrack();
+        } else {
+            await mediaPlayer.skipNext();
+        }
+    } catch (err) {
+        logger.error('Failed to skip next', err);
+    } finally {
+        isSkipping = false;
     }
 }
 
@@ -263,7 +296,7 @@ function observePlaylistAtStart(): Observable<boolean> {
 function lockLoading() {
     miniPlayer.lock();
     if (loadingLocked$.value === false) {
-        const {paused, currentTime} = playback;
+        const { paused, currentTime } = playback;
         if (!paused || currentTime > 0) {
             playback.stop();
             mediaPlayer.stop();
@@ -294,7 +327,7 @@ async function getPlayableItem(item: PlaylistItem | null): Promise<PlaylistItem 
             // Lookup the item if it's not from a playable source (e.g last.fm).
             const foundItem = await lookup(item);
             if (foundItem) {
-                item = {...item, ...foundItem};
+                item = { ...item, ...foundItem };
             } else {
                 return item;
             }
@@ -302,7 +335,7 @@ async function getPlayableItem(item: PlaylistItem | null): Promise<PlaylistItem 
         if (item.playbackType === undefined) {
             // Whether to use HLS, Dash, etc.
             const playbackType = await getPlaybackType(item);
-            item = {...item, playbackType};
+            item = { ...item, playbackType };
         }
     } catch (err) {
         logger.error(err);
@@ -327,7 +360,7 @@ async function getPlaybackType(item: PlaylistItem): Promise<PlaybackType> {
             }
             dispatchMetadataChanges({
                 match: (object) => object.src === item.src,
-                values: {playbackType},
+                values: { playbackType },
             });
         }
     } catch (err) {
@@ -400,7 +433,7 @@ export default mediaPlayback;
 // Synch playback settings.
 observePlaybackSettings()
     .pipe(
-        tap(({volume, muted, repeatMode}) => {
+        tap(({ volume, muted, repeatMode }) => {
             mediaPlayer.volume = volume;
             mediaPlayer.muted = muted;
             mediaPlayer.loop = repeatMode === RepeatMode.One;
@@ -471,13 +504,13 @@ if (!isMiniPlayer) {
             switchMap((item) =>
                 item
                     ? observeError().pipe(
-                          debounceTime(750), // delay before moving on
-                          withLatestFrom(
-                              playback.observePaused(),
-                              observePlaylistAtStart(),
-                              observePlaylistAtEnd()
-                          )
-                      )
+                        debounceTime(750), // delay before moving on
+                        withLatestFrom(
+                            playback.observePaused(),
+                            observePlaylistAtStart(),
+                            observePlaylistAtEnd()
+                        )
+                    )
                     : EMPTY
             )
         )
@@ -518,18 +551,18 @@ if (!isMiniPlayer) {
             switchMap((item) =>
                 item
                     ? playback.observePlaybackState().pipe(
-                          filter(({currentItem}) => currentItem?.id === item.id),
-                          map(({duration}) => duration),
-                          distinctUntilChanged(),
-                          filter((duration) => duration > 0 && duration !== item.duration),
-                          take(2), // If the duration keeps changing then maybe it's not so reliable.
-                          tap((duration) =>
-                              dispatchMetadataChanges({
-                                  match: (object) => (object as PlaylistItem).id === item.id,
-                                  values: {duration},
-                              })
-                          )
-                      )
+                        filter(({ currentItem }) => currentItem?.id === item.id),
+                        map(({ duration }) => duration),
+                        distinctUntilChanged(),
+                        filter((duration) => duration > 0 && duration !== item.duration),
+                        take(2), // If the duration keeps changing then maybe it's not so reliable.
+                        tap((duration) =>
+                            dispatchMetadataChanges({
+                                match: (object) => (object as PlaylistItem).id === item.id,
+                                values: { duration },
+                            })
+                        )
+                    )
                     : EMPTY
             )
         )
@@ -562,16 +595,16 @@ if (!isMiniPlayer) {
             switchMap((item) =>
                 item
                     ? of(item).pipe(
-                          tap(load),
-                          delayWhen(() => observePlaying()),
-                          take(1),
-                          delay(3_000),
-                          switchMap(() => playlist.observeNextItem()),
-                          distinctUntilChanged((a, b) => a?.id === b?.id),
-                          debounceTime(300),
-                          mergeMap((item) => getPlayableItem(item)),
-                          tap(loadNext)
-                      )
+                        tap(load),
+                        delayWhen(() => observePlaying()),
+                        take(1),
+                        delay(3_000),
+                        switchMap(() => playlist.observeNextItem()),
+                        distinctUntilChanged((a, b) => a?.id === b?.id),
+                        debounceTime(300),
+                        mergeMap((item) => getPlayableItem(item)),
+                        tap(loadNext)
+                    )
                     : EMPTY
             )
         )
